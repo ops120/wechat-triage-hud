@@ -882,7 +882,16 @@ class Scanner(QThread):
         ml, mt, mr, mb = wc.message_area(w.rect, lay)
         ox = min(pr[2], mr) - max(pr[0], ml)
         oy = min(pr[3], mb) - max(pr[1], mt)
-        return ox > 8 and oy > 8          # 8px 容差：贴边不算压
+        if ox <= 8 or oy <= 8:
+            return False                  # 8px 容差：贴边不算压
+        # **重叠很小就不算遮挡**：小球（52px）压在消息区上约 1%，它是一张圆图、没有文字，
+        # 读进去也污染不了输入；而按"相交即拦"会让球所在的位置一直扫不了
+        # （真机：用户把微信拖到右边，球正好落在消息区里 → 面板一直报"面板压住了消息区"）。
+        area_ov = ox * oy
+        area_msg = max(1, (mr - ml) * (mb - mt))
+        if area_ov / area_msg < 0.02:
+            return False
+        return True
 
     def _block(self, why: str) -> None:
         """只在原因变化时上报一次，避免每 2 秒刷同一条。"""
