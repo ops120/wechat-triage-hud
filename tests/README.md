@@ -36,8 +36,8 @@ python tests/dev_hud_buttons_verify.py
 HUD_SELFCHECK_VISIBLE=1 python tests/dev_hud_buttons_verify.py
 ```
 
-> CI 里只跑**真离线**的两套（`dev_log_concurrency_verify.py`、`dev_hud_buttons_verify.py`），
-> 其余都要真微信或真 Key，只能在真机上手动跑。
+> 其中**真离线**的两套（`dev_log_concurrency_verify.py`、`dev_hud_buttons_verify.py`）随时可跑，
+> 不联网、不花钱；其余要真微信或真 Key，只能在真机上手动跑（本项目**没有 CI**，全在本机验）。
 
 ## 文件
 

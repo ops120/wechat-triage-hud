@@ -30,7 +30,7 @@ Windows 10/11 + PC 微信（窗口需可见，最小化到托盘时读不到）�
 ## 提交前
 
 ```bash
-# 真离线、不花钱、不会弹到屏幕上（CI 里跑的就是这两套）
+# 真离线、不花钱、不会弹到屏幕上
 python tests/dev_log_concurrency_verify.py   # 跨进程写锁 + fsync
 python tests/dev_hud_buttons_verify.py       # 面板行为（无头；151 项）
 

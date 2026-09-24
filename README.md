@@ -55,6 +55,7 @@ staying silent unless something actually needs you. No injection into WeChat, no
 - [路线图](#路线图)
 - [社区](#社区)
 - [贡献](#贡献)
+- [参考与致谢](#参考与致谢)
 - [许可](#许可)
 
 ---
@@ -232,7 +233,7 @@ python -m wechat_triage_hud.hud      # 或装过包后用：wechat-triage-hud
 全部都是**可重复跑的真实验证**，不是自我宣称（跑法与环境见 [tests/README.md](tests/README.md)）：
 
 ```bash
-# ↓ 真离线（CI 跑这两套）
+# ↓ 真离线（不联网、不花钱、不弹到屏幕上）
 python tests/dev_log_concurrency_verify.py  # 跨进程写锁不交织 + fsync 按条数节流
 python tests/dev_hud_buttons_verify.py      # 按钮/菜单/小球/消息单判/风险档位（无头 151 项，屏幕上零出现）
 HUD_SELFCHECK_VISIBLE=1 python tests/dev_hud_buttons_verify.py   # 同一套，亲眼看它弹出来
@@ -260,7 +261,7 @@ wechat-triage-hud/
 ├── README.md  CHANGELOG.md  CONTRIBUTING.md  SECURITY.md
 ├── pyproject.toml             元数据 / 依赖 / 控制台入口
 ├── requirements.txt           依赖清单（含 tools/ 诊断脚本所需）
-├── .github/                   CI（只跑真离线的两套）、PR 与 issue 模板
+├── .github/                   PR 与 issue 模板
 ├── wechat_triage_hud/         产品代码
 │   ├── paths.py                统一路径（唯一一份，禁止各自 dirname 推算）
 │   ├── jev_log.py              审计日志写入器（强制、原始字节、文件锁）
@@ -339,6 +340,21 @@ wechat-triage-hud/
 
 见 [CONTRIBUTING.md](CONTRIBUTING.md)。最重要的一条：**这个项目里"能跑"不等于"已验证"** ——
 任何结论都要能指向一条可复现的验证或一份真实日志。
+
+## 参考与致谢
+
+- **TypeSafe 官方 skill**：题集结构（一次问多题、Noul / Choice 两类口径）与"允许弃权"设计的依据。
+- **[jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis)**（MIT）：私聊那几道题的口径与命名
+  （`true_intent` / `she_needs` / `danger_level` …）以及危险等级分档（≥7 / ≥5 / ≥3）参照了它 ——
+  它用一批中文标注集校准过。**本项目只借用口径，没有复制它的代码**；"关系判据"这一条采用了它的思路
+  （没填时给个默认关系），但**默认留空**，没有写死。
+- **[jev-chat/jev-chat-windows](https://github.com/jev-chat/jev-chat-windows)**（MIT）：同一平台
+  （Windows + 微信 4.x + RapidOCR + PySide6）的工程对照。它有几个做法我们记在案、还没采用：
+  Windows Graphics Capture 截屏（窗口被盖住也能截）、像素锚点定位消息区（不写死坐标、深浅主题通用）、
+  采集与 OCR 跑独立子进程、PyInstaller 打包分发。
+- 另有若干 Jev 生态的开源项目，作为架构取舍的参考。
+
+本项目代码为独立实现。将来若采用上述 MIT 项目（或其它第三方）的代码，会按其许可保留版权声明与许可文本。
 
 ## 许可
 
