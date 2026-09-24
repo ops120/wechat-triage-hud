@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Python 依赖：每周一检查（分组，避免一堆单人 PR）
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      python-deps:
+        patterns: ["*"]
+    ignore:
+      # OCR 与面板是"实测锁定"的依赖，升级必须真机复验，交给人工
+      - dependency-name: rapidocr-onnxruntime
+      - dependency-name: PySide6

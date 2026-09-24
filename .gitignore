@@ -1,0 +1,26 @@
+# 密钥与本地配置
+.env
+
+# 运行产物：审计日志、群元数据、调试日志、群昵称
+# 注意 out/ 里含**完整聊天原文**，绝不入库
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 编辑器与系统
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+
+# 外部参考实现（clone 下来分析用，不入库）
+.refs/
+
+# 本机 AI 工具（ZCode）的会话/计划状态，不属于产品代码
+.zcode/

@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wechat-triage-hud"
+version = "0.1.0"
+description = "微信 PC 端悬浮副驾：离线 OCR 读屏 + TypeSafe Jev 判断「这轮谁需要我出手」"
+readme = "README.md"
+requires-python = ">=3.10"
+# TODO(发布前): 换成你的名字或 GitHub ID（LICENSE 的版权归属同样以这里为准）
+authors = [{ name = "ops120" }]
+license = { text = "Apache-2.0" }
+keywords = ["wechat", "hud", "ocr", "rapidocr", "typesafe", "jev", "triage"]
+classifiers = [
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Topic :: Communications :: Chat",
+    "Topic :: Utilities",
+    "License :: OSI Approved :: Apache Software License",
+]
+# 运行依赖（与 requirements.txt 保持一致；那边多列了 tools/ 诊断脚本才需要的东西）
+dependencies = [
+    "mss>=10.2.0",                  # 截屏
+    "numpy>=2.2",
+    "opencv-python>=4.12",          # 标题区 3× 放大后再 OCR
+    "rapidocr-onnxruntime>=1.2.3",  # 本地离线 OCR，不联网
+    "PySide6>=6.9",                 # 悬浮面板
+    "psutil>=7.2",                  # 进程/窗口枚举
+    "pywin32>=311",                 # win32gui / win32con
+]
+
+[project.optional-dependencies]
+# 仅 tools/ 里的诊断脚本需要（UIA 路线已实测不可用，留作排查）
+tools = ["comtypes>=1.4", "Pillow>=12.3"]
+
+[project.urls]
+Homepage = "https://github.com/ops120/wechat-triage-hud"          # TODO: 换成真实地址
+Changelog = "https://github.com/ops120/wechat-triage-hud/blob/main/CHANGELOG.md"
+
+[project.scripts]
+wechat-triage-hud = "wechat_triage_hud.hud:main"
+
+[tool.setuptools]
+packages = ["wechat_triage_hud"]
+
+[tool.setuptools.package-data]
+wechat_triage_hud = ["assets/*.png"]

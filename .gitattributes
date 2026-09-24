@@ -1,0 +1,17 @@
+# 统一换行：仓库里一律 LF（Windows 上检出时 Python 脚本也保持 LF，避免行尾混杂）
+* text=auto eol=lf
+
+# 二进制资源别做文本转换与 diff
+*.png binary
+*.jpg binary
+*.ico binary
+*.onnx binary
+*.zip binary
+
+# 文档与代码的语言统计（GitHub 语言栏不该把 markdown 算成主语言）
+docs/** linguist-documentation
+tests/** linguist-documentation
+tools/** linguist-vendored=false
+
+# 生成物不进 diff
+out/** -diff

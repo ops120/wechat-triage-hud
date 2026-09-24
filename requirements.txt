@@ -1,0 +1,12 @@
+# 运行依赖（本机实测版本，见 README 的"环境"）
+mss>=10.2.0
+numpy>=2.2
+opencv-python>=4.12          # 标题区 3× 放大后再 OCR
+rapidocr-onnxruntime>=1.2.3  # 本地离线 OCR，不联网
+PySide6>=6.9                 # 悬浮面板
+psutil>=7.2                  # 进程/窗口枚举
+pywin32>=311                 # win32gui / win32con
+
+# 仅 tools/ 里的诊断脚本需要（UIA 路线已实测不可用，留作排查用）
+comtypes>=1.4
+Pillow>=12.3

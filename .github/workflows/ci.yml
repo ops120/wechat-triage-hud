@@ -1,0 +1,49 @@
+name: CI
+
+# 只跑**真离线**的两套：不需要微信、不需要 API Key、不花钱、也不会弹到任何人的屏幕上。
+# 其余验收必须在有微信 + 真 Key 的 Windows 上手动跑（见 tests/README.md）：
+#   · dev_p1_verify     要真 Key 与网络（3 次正常调用 + 故意发坏请求换 400，花费极小）
+#   · dev_occlusion_verify / dev_p0_verify / dev_hud_survival  要真微信窗口
+#   · eval_qset         要真 Key（约 $0.001 / 6 次）
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  offline:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    env:
+      # 自检默认就是无头；这里显式写一遍，避免有人改了默认值还以为 CI 会弹窗
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 跨进程写锁 + fsync 节流（离线）
+        run: python tests/dev_log_concurrency_verify.py
+
+      - name: 面板行为自检（无头，112 项）
+        run: python tests/dev_hud_buttons_verify.py
+
+      - name: 结论文件（面板行为自检的判定依据）
+        if: always()
+        run: |
+          if (Test-Path out/selfcheck_result.txt) { Get-Content out/selfcheck_result.txt } else { "没有结论文件 = 自检没跑到最后" }
