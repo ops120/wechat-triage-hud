@@ -1143,9 +1143,7 @@ class HudBar(QWidget):
         # 置顶、不抢焦点、单实例、位置跟随这些机制不用维护两套。
         self.prefs = UiPrefs()
         self.ball_mode = bool(self.prefs.get("ball_mode", False))
-        # 「关闭展板」只在内存里记（不写存档）：隐藏期间 follow() 让路，直到用户召回
-        self._user_hidden = False
-        self._hide_noted = False        # "已隐藏"的托盘气泡每次运行只提示一次
+        self._hide_noted = False        # "已收成小球"的托盘气泡每次运行只提示一次
         self.ball_xy = self.prefs.get("ball_xy")
         self._ball_bad = None       # 扫描出问题时的原因（球变红）
         self._ball_qss = None       # 上次的样式，避免每 3 秒重复刷样式表
@@ -1231,7 +1229,7 @@ class HudBar(QWidget):
         # 隐藏的代价只是再点一下托盘，退出仍走右键菜单「退出」。
         self.btn_hide = QPushButton("关闭")
         self.btn_hide.setObjectName("link")
-        self.btn_hide.setToolTip("关闭展板：隐藏面板（双击托盘图标 / 托盘菜单可召回；"
+        self.btn_hide.setToolTip("关闭展板：收成小球（面板收起、球留在屏幕上，点球或双击托盘展开；"
                                  "退出程序请用右键菜单「退出」）")
         self.btn_hide.clicked.connect(self.hide_panel)
         # 标题栏不放「退出」（误触一次面板就没了）、不放「收成小球」（用户："没啥用"）、
@@ -1769,11 +1767,8 @@ class HudBar(QWidget):
         m = QMenu()
         a1 = m.addAction("继续采集" if self.paused else "暂停采集（免打扰）")
         a1.triggered.connect(lambda: self.toggle_pause())
-        a2 = m.addAction("展开面板" if (self.ball_mode or self._user_hidden) else "收成小球")
-        if self._user_hidden:
-            a2.triggered.connect(self.show_panel)     # 被「关闭展板」藏起来时，托盘是召回入口
-        else:
-            a2.triggered.connect(lambda: self.set_ball(not self.ball_mode))
+        a2 = m.addAction("展开面板" if self.ball_mode else "收成小球")
+        a2.triggered.connect(lambda: self.set_ball(not self.ball_mode))
         a4 = m.addAction("设置…")
         a4.triggered.connect(self.open_settings)
         m.addSeparator()
@@ -1781,52 +1776,41 @@ class HudBar(QWidget):
         a3.triggered.connect(self._on_close)
         self.tray.setContextMenu(m)
         self.tray.setIcon(self._tray_icon())
-        state = "面板已隐藏 · 双击召回" if self._user_hidden else (
-            "已暂停" if self.paused else "采集中")
+        state = "小球形态" if self.ball_mode else ("已暂停" if self.paused else "采集中")
         self.tray.setToolTip(f"微信分诊面板（{state}）")
         self._tray_menu = m                         # 防 GC
 
     def hide_panel(self, note: bool = True) -> None:
-        """「关闭展板」：只隐藏面板，**不退出程序**（用户 2026-09-24 的明确选择）。
+        """「关闭」= **收成一颗小球**（面板本体收起，球留在屏幕上）。
 
-        `follow()` 每 600ms 会把窗口重新显示出来（那是"跟着微信走"的正常行为），
-        所以必须有 `_user_hidden` 这个闸：隐藏期间 follow() 直接让路，直到用户召回
-        （双击托盘 / 托盘菜单「展开面板」/ 再启动一次 exe）。
-        隐藏状态**只在内存**、不写存档：重启面板仍会正常出现，免得"起来了却什么都没有"。
+        为什么不是「彻底隐藏」：那版真机一试就露馅 —— 关掉之后屏幕上什么都没有，
+        用户的原话是「小球看不见」，还得双击托盘才找得回来（日志：00:09:40 关闭 →
+        00:09:47 召回 → 00:09:51 又关闭）。球才是最小形态该有的样子：留着、能点开、
+        外环颜色就是状态。想彻底退出走右键菜单「退出」。
         """
-        dbg("关闭展板：隐藏窗口（进程继续跑，双击托盘可召回）")
-        self._user_hidden = True
-        self.hide()
+        dbg("关闭展板 → 收成小球（面板收起，球留在屏幕上）")
+        self.set_ball(True)
         self._refresh_tray()
         if note and not self._hide_noted:
-            # 每次运行只提示一次：不是消息提醒器，但"我点了个关闭，它去哪了"必须有答案
-            self._hide_noted = True
+            self._hide_noted = True        # 每次运行只提示一次
             if self.tray is not None:
                 try:
-                    self.tray.showMessage("面板已隐藏",
-                                          "程序还在跑（仍在采集）。双击托盘图标可召回面板，"
-                                          "右键托盘 →「退出」才是退出。")
+                    self.tray.showMessage("已收成小球",
+                                          "点球或双击托盘图标展开；退出程序请右键面板 →「退出」。")
                 except Exception:
                     pass
 
     def show_panel(self) -> None:
-        """召回隐藏的面板（双击托盘 / 托盘菜单 / 另一实例启动都走这里）。"""
-        self._user_hidden = False
+        """把面板显示出来（双击托盘 / 托盘菜单 / 另一实例启动都走这里）。"""
         self.show()
         self._refresh_tray()
         dbg("召回面板")
 
     def _on_tray_activated(self, reason) -> None:
         if reason == QSystemTrayIcon.DoubleClick:
-            if self._user_hidden or self.ball_mode:
-                # 双击托盘 = "把它叫回来"：隐藏的显示、小球的展开（用户被"关闭展板"藏了
-                # 面板以后，第一反应就是双击托盘）
-                self.show_panel()
-            else:
-                self.set_ball(True)
-                self.hide()
-                self._user_hidden = True
-                self._refresh_tray()
+            # 双击托盘 = 收起/展开（球 ↔ 面板）
+            self.show_panel()
+            self.set_ball(not self.ball_mode)
 
     def _register_hotkey(self) -> None:
         """全局热键 Ctrl+Alt+H：面板隐藏/小球/被遮挡时都能按到（F-21）。"""
@@ -1903,10 +1887,6 @@ class HudBar(QWidget):
         self._check_expand_request()
         self._check_scanner()
         self._flush_hist()
-        if self._user_hidden:
-            # 用户按了「关闭展板」→ 这一轮什么都不做。**必须在 setVisible(True) 之前返回**，
-            # 否则 600ms 后面板自己就弹回来了，"关闭"看着像没生效。
-            return
         if self.dragging or self._user_resizing:
             # 用户正在拖右下角把手：这时**不能**再按内容算尺寸/挪位置，否则会和用户抢 ——
             # 真机实测：轮询把宽度重新 setFixedWidth 回原值，结果"只有高度能拖，宽度拖不动"

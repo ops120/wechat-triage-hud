@@ -1940,22 +1940,29 @@ def main() -> int:
           not bar18.left_panel.isVisible() and not bar18.l_cols.isVisible(),
           f"左列可见={bar18.left_panel.isVisible()} 列头可见={bar18.l_cols.isVisible()}")
 
-    # —— 「关闭展板」：只隐藏，不退出 ——
+    # —— 「关闭」= 收成小球（面板收起、球留着；不是"彻底隐藏"）——
+    # 真机踩过：早先做成"彻底隐藏"→ 用户点完屏幕上什么都没有，反馈"小球看不见"。
     bar18.topic = "群聊"
     bar18._apply_scene_labels()
+    bar18.set_ball(False, save=False)
     bar18.show()
     QTest.mouseClick(bar18.btn_hide, Qt.LeftButton)
-    app.processEvents()
-    check("「关闭」= 隐藏面板（窗口不可见，进程与对象都还在）",
-          (not bar18.isVisible()) and bar18._user_hidden and bar18.worker is not None,
-          f"可见={bar18.isVisible()} 隐藏标志={bar18._user_hidden}")
+    for _ in range(4):
+        app.processEvents()
+        time.sleep(0.05)
+    check("「关闭」= 收成小球（52x52、球可见、窗口还在）",
+          bar18.ball_mode and bar18.ball.isVisible() and bar18.isVisible()
+          and (bar18.width(), bar18.height()) == (H.BALL, H.BALL),
+          f"球形态={bar18.ball_mode} 球可见={bar18.ball.isVisible()} "
+          f"窗口可见={bar18.isVisible()} {bar18.width()}x{bar18.height()}")
     bar18.follow()
-    check("隐藏后 follow() 不会把面板自己弹回来（600ms 轮询不是漏网）",
-          not bar18.isVisible(), f"可见={bar18.isVisible()}")
-    bar18.show_panel()
-    check("召回：show_panel 后重新可见、隐藏标志复位",
-          bar18.isVisible() and not bar18._user_hidden,
-          f"可见={bar18.isVisible()} 隐藏标志={bar18._user_hidden}")
+    check("收成小球后 follow() 不会把它藏起来（球该在屏幕上）",
+          bar18.isVisible() and bar18.ball.isVisible(),
+          f"窗口可见={bar18.isVisible()} 球可见={bar18.ball.isVisible()}")
+    bar18.set_ball(False, save=False)
+    check("展开回来：面板可见、球收起",
+          bar18.isVisible() and bar18.card.isVisible() and not bar18.ball.isVisible(),
+          f"卡片可见={bar18.card.isVisible()} 球可见={bar18.ball.isVisible()}")
 
     # —— 切群快不快：节流按会话 + 免去抖 + 切回显示上一轮 ——
     outs_before = set(os.listdir(H.OUT_DIR)) if os.path.isdir(H.OUT_DIR) else set()
