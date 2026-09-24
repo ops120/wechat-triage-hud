@@ -11,6 +11,10 @@
 
 - **打包版 OCR 自检**：`wechat-triage-hud.exe --selftest-ocr` —— 不依赖微信窗口，直接画一张
   带字的图喂 OCR，结果写 `out/selftest_ocr.txt`，退出码 0 = 通过
+- **打包脚本自检与瘦身**：`build.bat` 现在会暂存/放回 `dist\.env` 与 `dist\out\`（重建不再弄丢
+  Key 与打包版数据）、打包后**自动跑 `--selftest-ocr`**（不通过就失败）、`--zip` 可产出直接分发的
+  压缩包（自动排除 `.env` 与 `out\`）；spec 排除 `llvmlite`/`scipy`/`numba` 等被间接拖进来的死重
+  （实测导入 OCR 全链并未加载它们）—— 产物 **554MB → 365MB**
 - **打包成 exe**：`build.bat` + `packaging/`（PyInstaller onedir + 无控制台 + 启动器兜住 stdout）。
   打包后**数据目录落在 exe 旁边**（`paths.resolve_project_dir()`；否则 `out/` 会写进临时解包目录，
   重启即失、也读不到用户放在 exe 旁的 `.env`）。实测：exe 启动、面板、托盘、热键、OCR、

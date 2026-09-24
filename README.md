@@ -156,11 +156,15 @@ build.bat          :: 双击运行；产物在 dist\wechat-triage-hud\
 ```
 
 - **前提**：Windows + Python 3.10+ + `pip install -r requirements.txt pyinstaller`
-- **产物**：`dist\wechat-triage-hud\`（实测约 **550 MB**，大头是 PySide6 与离线 OCR 模型）。
+- **产物**：`dist\wechat-triage-hud\`（实测约 **365 MB**，大头是 opencv 111MB + onnxruntime 40MB +
+  Qt ICU 31MB + OCR 模型；`llvmlite`/`scipy` 那 180MB 属于被间接拖进来的死重，spec 里已排除）。
   整个文件夹拷给他人即可，`wechat-triage-hud.exe` 双击就能跑
 - **数据落在 exe 旁边**（`out\` 与 `.env`），不是临时目录 —— 拷走文件夹，日志与设置跟着走
-- `build.bat` 会把 `.env.example` 与 `使用说明.txt` 一并放进产物目录（第一次用：改名 `.env` 并填 Key）；
+- `build.bat` 会把 `.env.example` 与 `guide.txt`（使用说明）一并放进产物目录（第一次用：改名 `.env` 并填 Key）；
   直接用 `python -m PyInstaller` 打包则不会有这两个文件
+- 脚本**自己会把该做的都做了**：重建前暂存 `dist\.env` 与 `dist\out\`（不会弄丢你的 Key 与
+  打包版数据）→ 打包 → 放回 → **跑一次 `--selftest-ocr`，不通过就明确失败**（别把坏包发出去）
+- 要分发就 `build.bat --zip`：额外打一个 zip，**自动排除 `.env` 与 `out\`**（Key 与聊天日志不上路）
 
 **打完包先跑这条自检**（不依赖微信窗口，直接验 OCR 引擎能不能用）：
 

@@ -78,7 +78,12 @@ a = Analysis(
     hiddenimports=hidden,
     hookspath=[],
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "pandas", "pytest", "setuptools"],
+    # 实测产物构成：llvmlite 115MB + scipy 47MB + scipy.libs 20MB 全是被间接拖进来的
+    # （numba 链路），而**导入 OCR 全链后 sys.modules 里根本没有它们**（实测过）——
+    # 排掉它们体积直接从 554MB 掉到三百多兆。cv2 不能排：版面检测用了联通域分析。
+    excludes=["tkinter", "matplotlib", "pandas", "pytest", "setuptools", "pip",
+              "numba", "llvmlite", "scipy", "sklearn", "IPython", "jupyter",
+              "notebook", "docutils", "pydoc_data"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
