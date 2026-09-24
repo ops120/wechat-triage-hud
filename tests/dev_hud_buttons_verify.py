@@ -1977,6 +1977,22 @@ def main() -> int:
           and any("ffi" in p
                   for p in _dp.dll_patterns("G:/r/.venv-build", "G:/ProgramData/miniconda3")),
           f"{_dp.dll_patterns('G:/r/.venv-build', 'G:/ProgramData/miniconda3')[:3]}…")
+    check("打包 Qt 插件策略：platforms 是必需项，且缺目录时安全返回空",
+          "platforms" in _dp.PYSIDE_PLUGIN_KINDS
+          and _dp.pyside_plugin_files("", "platforms") == []
+          and _dp.pyside_plugin_files(os.path.join(TMP, "no_such_pyside"), "platforms") == [],
+          f"kinds={_dp.PYSIDE_PLUGIN_KINDS[:3]}")
+    # 合成一个 plugins/<类> 目录来验"收哪些文件"：不依赖本机装没装 PySide6
+    _fake_ps = os.path.join(TMP, "fake_pyside")
+    _fake_plat = os.path.join(_fake_ps, "plugins", "platforms")
+    os.makedirs(_fake_plat, exist_ok=True)
+    for _n in ("qwindows.dll", "notes.txt"):
+        with open(os.path.join(_fake_plat, _n), "wb") as _f:
+            _f.write(b"x")
+    check("打包 Qt 插件策略：plugins/<类> 里的 dll 会被收（非 dll 不收）",
+          [os.path.basename(p) for p in _dp.pyside_plugin_files(_fake_ps, "platforms")]
+          == ["qwindows.dll"],
+          f"{[os.path.basename(p) for p in _dp.pyside_plugin_files(_fake_ps, 'platforms')]}")
     check("打包 DLL 策略：conda 本体才借 Qt/shiboken",
           any("Qt6" in p for p in _dp.dll_patterns("G:/miniconda3", "G:/miniconda3"))
           and any("shiboken" in p for p in _dp.dll_patterns("G:/miniconda3", "G:/miniconda3")),

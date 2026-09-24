@@ -38,6 +38,19 @@ from dll_policy import all_patterns as _all_patterns
 for _f in _all_patterns(_sys.prefix, getattr(_sys, "base_prefix", None)):
     binaries.append((_f, "."))
 
+# Qt 插件（平台插件是必需的）：PySide6 6.11 起插件在 <site-packages>/PySide6/plugins/，
+# 而 PyInstaller 的钩子没收集（venv 版实测缺 plugins → 启动报
+# "Could not find the Qt platform plugin windows"）。显式收一遍，装到 PySide6/plugins/<类>。
+try:
+    import PySide6
+    _PYSIDE_DIR = os.path.dirname(os.path.abspath(PySide6.__file__))
+except Exception:                                # noqa: BLE001
+    _PYSIDE_DIR = None
+from dll_policy import PYSIDE_PLUGIN_KINDS as _KINDS, pyside_plugin_files as _plugin_files
+for _kind in _KINDS:
+    for _f in _plugin_files(_PYSIDE_DIR, _kind):
+        datas.append((_f, os.path.join("PySide6", "plugins", _kind)))
+
 hidden = ["win32gui", "win32con", "win32api"]
 try:
     from PyInstaller.utils.hooks import collect_all, collect_submodules
@@ -90,7 +103,9 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,                     # UPX 压缩过 Qt DLL 容易被杀软误报，不好排查
-    console=False,                 # 无控制台（HUD）
+    # 默认无控制台（HUD 不该弹黑框）；排查打包问题时用 HUD_BUILD_CONSOLE=1 出一版带控制台的，
+    # 启动期的 ImportError 会直接打在终端上（否则 windowed 版只会弹个对话框、看不到细节）。
+    console=bool(os.environ.get("HUD_BUILD_CONSOLE")),
     disable_windowed_traceback=False,
     icon=ICON,
 )

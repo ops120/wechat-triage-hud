@@ -56,3 +56,20 @@ def all_patterns(prefix: str | None, base_prefix: str | None,
                 if f.endswith(".dll"):
                     out.append(f)
     return out
+
+
+# Qt 的插件（平台插件 qwindows.dll 是**必需**的：缺了启动就报
+# "Could not find the Qt platform plugin windows"）。PySide6 6.11 把插件放在
+# <site-packages>/PySide6/plugins/ 下，而 PyInstaller 的钩子没收集它们
+# （venv 版实测：包里连 plugins 目录都没有）→ 这里显式收，装到包内 `PySide6/plugins/<类>`，
+# 与 PyInstaller 的 PySide6 运行时钩子期望的位置一致。
+PYSIDE_PLUGIN_KINDS = ("platforms", "styles", "imageformats", "iconengines", "platformthemes")
+
+
+def pyside_plugin_files(pyside_dir: str | None, kind: str) -> list:
+    """某个插件类目下的文件（给 spec 用；目录不存在就返回空）。"""
+    if not pyside_dir:
+        return []
+    import glob
+    d = os.path.join(pyside_dir, "plugins", kind)
+    return sorted(f for f in glob.glob(os.path.join(d, "*.dll")) if f.endswith(".dll"))

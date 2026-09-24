@@ -14,7 +14,7 @@
 - **打包脚本自检与瘦身**：`build.bat` 现在会暂存/放回 `dist\.env` 与 `dist\out\`（重建不再弄丢
   Key 与打包版数据）、打包后**自动跑 `--selftest-ocr`**（不通过就失败）、`--zip` 可产出直接分发的
   压缩包（自动排除 `.env` 与 `out\`）；spec 排除 `llvmlite`/`scipy`/`numba` 等被间接拖进来的死重
-  （实测导入 OCR 全链并未加载它们）—— 产物 **554MB → 365MB**
+  （实测导入 OCR 全链并未加载它们）—— 产物 **554MB → 约 360MB**
 - **打包成 exe**：`build.bat` + `packaging/`（PyInstaller onedir + 无控制台 + 启动器兜住 stdout）。
   打包后**数据目录落在 exe 旁边**（`paths.resolve_project_dir()`；否则 `out/` 会写进临时解包目录，
   重启即失、也读不到用户放在 exe 旁的 `.env`）。实测：exe 启动、面板、托盘、热键、OCR、
@@ -80,13 +80,19 @@
   conda 建的 venv 只借 stdlib（借 Qt 会两套混装 → `DLL load failed while importing QtGui`）、
   **没有 conda 的用户一个都不借**（PyInstaller 常规路径，这段对他们完全是空操作）。
   自检 +3 条断言钉住这三类环境
-- **没配 API Key 时面板不再"无声地卡住"**
-
+- **`build.bat --venv` 打出来的包窗口一个都不出来**：报
+  `qt.qpa.plugin: Could not find the Qt platform plugin "windows"`。venv 里是 pip 的
+  **PySide6 6.11**，它的插件在 `<site-packages>/PySide6/plugins/`，而 PyInstaller 的钩子没收集
+  它们（conda 的 6.9 走另一条路，所以只有 venv 版踩到）。现在 spec 显式把 `PySide6/plugins/<类>`
+  收进包（策略仍抽在 `packaging/dll_policy.py`，自检 +2 条断言）。**两条路都重验**：conda 包
+  360MB、venv 包 289MB，`--selftest-ocr` 均通过、GUI 均实测起来（启动行 → 托盘 → 热键 → 小球 →
+  扫描循环，进程持续存活）；另加 `HUD_BUILD_CONSOLE=1`：打包时设它会出一个**带控制台**的包，
+  启动崩在哪一行直接打印出来（这条错就是这么定位的）。`--selftest-ocr` 本身要建 QGuiApplication
+  —— 平台插件缺了它根本跑不起来，所以打包自检也顺带守住了这条
 - **小球压住微信消息区时会让扫描一直停摆**：自遮挡保护原来是"矩形相交（>8px）就算遮挡"，
   于是用户把微信拖到右边、球正好落在消息区里 → 面板一直报"面板压住了微信消息区"、什么都不判。
   改成按**重叠比例**判：重叠不到消息区面积的 **2%** 不算遮挡（52px 球约 1%，而且它是一张圆图、
   没有文字，读进去也污染不了输入）。自检第 18 节加了这一情形
-
 - **没配 API Key 时面板"无声地卡住"**（用户报"怎么卡住了"）：打包版旁边没有 `.env` →
   判断线程初始化就失败、之后提交的任务永远没人处理，而面板只在右栏留了一行小字，
   进度行一直停在「提交判断 · N 人待筛」、日志 0 B，看着就像在忙。现在：启动就检查 Key

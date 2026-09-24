@@ -43,7 +43,7 @@ HUD_SELFCHECK_VISIBLE=1 python tests/dev_hud_buttons_verify.py
 
 | 文件 | 是什么 | 需要微信/网络吗 |
 | :--- | :--- | :--- |
-| `dev_hud_buttons_verify.py` | 面板按钮 / 右键菜单 / 小球形态 / 点消息单判（151 项，默认无头；可视模式 152 项） | 不要（`wc.grab` 被换成抛错，审计写临时目录） |
+| `dev_hud_buttons_verify.py` | 面板按钮 / 右键菜单 / 小球形态 / 点消息单判（160 项，默认无头；可视模式 161 项） | 不要（`wc.grab` 被换成抛错，审计写临时目录） |
 | `dev_p0_verify.py` | 面板交互：点击送达、📌 固定与跟随、滚动、右键「退出」后进程归零 | 要真面板 + 可见微信 |
 | `dev_p1_verify.py` | 审计日志"全都记"：重试各成一条、无 Key 明文、截断显式标记 | **要** Key 与网络（3 次真实调用，花费极小）|
 | `dev_log_concurrency_verify.py` | 跨进程写锁不交织、fsync 按条数节流 | 不要（纯离线）|

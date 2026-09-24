@@ -157,12 +157,13 @@ build.bat --venv   :: 改用 pip 虚拟环境打包（首次自动建 .venv-buil
 ```
 
 - **前提**：Windows + Python 3.10+ + `pip install -r requirements.txt pyinstaller`
-- **conda 还是 venv？两个都行**：脚本用当前 PATH 上的 `python`，开头会打印正在用哪个环境。
-  conda 已实测通过（spec 里兜住了"conda 把 Qt/PySide6/libffi 的 DLL 放在 `Library\bin`"这件事）；
-  `--venv` 走 PyInstaller 官方假设的 pip 环境（PySide6 轮子自带 DLL，更省事）
-- **产物**：`dist\wechat-triage-hud\`（实测约 **365 MB**，大头是 opencv 111MB + onnxruntime 40MB +
-  Qt ICU 31MB + OCR 模型；`llvmlite`/`scipy` 那 180MB 属于被间接拖进来的死重，spec 里已排除）。
-  整个文件夹拷给他人即可，`wechat-triage-hud.exe` 双击就能跑
+- **conda 还是 venv？两个都行，两条路都实测过**：脚本用当前 PATH 上的 `python`，开头会打印
+  正在用哪个环境。conda 已实测通过（spec 里兜住了"conda 把 Qt/PySide6/libffi 的 DLL 放在
+  `Library\bin`"这件事）；`--venv` 走 PyInstaller 官方假设的 pip 环境（PySide6 轮子自带 DLL，
+  更省事），**不需要本机装过 conda**
+- **产物**：`dist\wechat-triage-hud\`（实测 conda 约 **360 MB** / venv 约 **289 MB**，大头是
+  opencv 111MB + onnxruntime 40MB + Qt ICU 31MB + OCR 模型；`llvmlite`/`scipy` 那 180MB 属于被
+  间接拖进来的死重，spec 里已排除）。整个文件夹拷给他人即可，`wechat-triage-hud.exe` 双击就能跑
 - **数据落在 exe 旁边**（`out\` 与 `.env`），不是临时目录 —— 拷走文件夹，日志与设置跟着走
 - `build.bat` 会把 `.env.example` 与 `guide.txt`（使用说明）一并放进产物目录（第一次用：改名 `.env` 并填 Key）；
   直接用 `python -m PyInstaller` 打包则不会有这两个文件
@@ -185,17 +186,29 @@ dist\wechat-triage-hud\wechat-triage-hud.exe --selftest-ocr
 > 并靠上面这条自检守住。第一次打包时我只验了"exe 能启动"，扫描又恰好被遮挡校验拦在 OCR 之前，
 > 于是这条漏了 —— 用户先撞到的。
 
-实测记录：`--selftest-ocr` 通过（识别出「你好 hello 123」）；exe 启动、面板窗口、托盘图标、
-全局热键、遮挡判定（微信被盖住时不扫）均正常，`out\` 确实建在 exe 旁边。
+实测记录（**conda 与 venv 两条路各验一遍**）：`--selftest-ocr` 均通过（识别出「你好 hello 123」）；
+exe 均实测启动 —— 启动行、面板窗口、托盘图标、全局热键、小球形态、扫描循环都正常，进程持续存活，
+`out\` 确实建在 exe 旁边（不是临时解包目录）。
 
-打包报错时（两个实际踩过的坑）：
+打包报错时（三个实际踩过的坑）：
 
 - **`ImportError: DLL load failed while importing _ctypes / Shiboken`** —— 你在 **conda 环境**里打包：
   conda 把 Qt / PySide6 / libffi 的 DLL 放在 `<prefix>\Library\bin`（pip 轮子才放在包内），
-  `packaging/wechat-triage-hud.spec` 已按文件名收集了一批；若还缺，改用 pip 虚拟环境最省事：
+  `packaging/wechat-triage-hud.spec` 已按文件名收集了一批（顺带兜住"conda 建的 venv **只借
+  stdlib**、不借 conda 的 Qt" —— 两边都借会两套 Qt 混装，报 `DLL load failed while importing
+  QtGui`）；若还缺，改用 pip 虚拟环境最省事：
   `python -m venv .venv-build` → `.venv-build\Scripts\pip install -r requirements.txt pyinstaller`
+- **`qt.qpa.plugin: Could not find the Qt platform plugin "windows"`**（窗口一个都不出来） —— `--venv`
+  里是 pip 的 **PySide6 6.11**：它的插件在 `<site-packages>/PySide6/plugins/`，而 PyInstaller
+  的钩子没收集它们（conda 的 6.9 走另一条路，所以只有 venv 版踩到）。spec 现在显式收集
+  `PySide6/plugins/<类>`；换 PySide6 大版本后若又见这条，先看
+  `dist\wechat-triage-hud\_internal\PySide6\plugins\platforms\qwindows.dll` 在不在
 - **`PermissionError: ..._internal\xxx.dll`** —— 上一个 exe 还在跑（窗口版崩溃时会挂着错误框）：
   先退出，或 `taskkill /F /IM wechat-triage-hud.exe`
+
+> **窗口版"能装不能跑"时怎么抓原因**：打包前设 `set HUD_BUILD_CONSOLE=1` 再跑 `build.bat`，
+> 会出一个**带控制台**的包 —— 启动时崩在哪一行直接打在黑框里（上面那条 Qt 平台插件错就是
+> 这么定位到的）。发布用的还是默认的无控制台包。
 
 ## 隐私
 
@@ -210,7 +223,7 @@ API Key 只放 `.env`，面板与审计日志里只出现指纹。数据流、�
 ## 项目状态
 
 **版本 0.1.0（2026-09-24）。** 真机验收 6 套全部通过：审计日志 11 项 · 跨进程写锁 · 遮挡校验 ·
-面板交互 · 问题集四项指标 · 按钮 / 菜单 / 小球 / 消息单判自检（离线套件无头 151 项、可视模式 152 项）。
+面板交互 · 问题集四项指标 · 按钮 / 菜单 / 小球 / 消息单判自检（离线套件无头 160 项、可视模式 161 项）。
 跑法与前置条件见 [tests/README.md](tests/README.md)。
 
 **尚未验证 / 已知限制**：
@@ -253,7 +266,7 @@ API Key 只放 `.env`，面板与审计日志里只出现指纹。数据流、�
 ```bash
 # ↓ 真离线（不联网、不花钱、不弹到屏幕上）
 python tests/dev_log_concurrency_verify.py  # 跨进程写锁不交织 + fsync 按条数节流
-python tests/dev_hud_buttons_verify.py      # 按钮/菜单/小球/消息单判/风险档位（无头 151 项）
+python tests/dev_hud_buttons_verify.py      # 按钮/菜单/小球/消息单判/风险档位（无头 160 项）
 HUD_SELFCHECK_VISIBLE=1 python tests/dev_hud_buttons_verify.py   # 同一套，可视化运行
 
 # ↓ 要真 Key 与网络（花费极小）
