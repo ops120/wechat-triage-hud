@@ -5,6 +5,10 @@
 # 注意 out/ 里含**完整聊天原文**，绝不入库
 out/
 
+# 打包产物（build.bat 生成；源码才是版本管理的对象）
+build/
+dist/
+
 # Python
 __pycache__/
 *.py[cod]

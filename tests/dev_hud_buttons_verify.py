@@ -1901,6 +1901,17 @@ def main() -> int:
     bar18.results = {"小满": d18}
     bar18._rebuild_rows([d18], 1)
 
+    # 打包（PyInstaller）后数据目录必须落在 **exe 旁边**，不能落在临时解包目录 ——
+    # 否则 out/（审计日志/设置/累积历史）重启就没，用户放在 exe 旁边的 .env 也读不到。
+    # 这个坑只有打包后才暴露，所以把路径逻辑抽成纯函数在这里钉死。
+    from wechat_triage_hud.paths import resolve_project_dir as _rpd
+    _exe_dir = _rpd("/tmp/_MEI123/wechat_triage_hud", True, "D:/dist/app.exe")
+    _dev_dir = _rpd("G:/repo/wechat_triage_hud", False, None)
+    check("打包后数据目录 = exe 所在目录（不是临时解包目录）",
+          os.path.normpath(_exe_dir) == os.path.normpath("D:/dist")
+          and os.path.normpath(_dev_dir) == os.path.normpath("G:/repo"),
+          f"冻结时={_exe_dir!r} 开发时={_dev_dir!r}")
+
     bar18.topic = "单聊"                       # 私聊：第二列放的是危险等级文字
     bar18._apply_scene_labels()
     check("私聊的列头文案跟着换（危险等级 / 信息量）",

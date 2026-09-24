@@ -20,9 +20,29 @@
 from __future__ import annotations
 
 import os
+import sys
 
-PKG_DIR = os.path.dirname(os.path.abspath(__file__))       # wechat_triage_hud/
-PROJECT_DIR = os.path.dirname(PKG_DIR)                     # 仓库根
+PKG_DIR = os.path.dirname(os.path.abspath(__file__))       # wechat_triage_hud/（打包后=解包目录里的包）
+
+
+def resolve_project_dir(pkg_dir: str, frozen: bool, exe: str | None) -> str:
+    """数据目录：**打包成 exe 后是 exe 所在目录，不是包目录**。
+
+    踩点说明：冻结后 `__file__` 落在 PyInstaller 的临时解包目录（`_MEIPASS`）里，
+    如果还按 `dirname(PKG_DIR)` 算，`out/`（审计日志、群元数据、设置、累积历史）
+    全都会写进临时目录 —— 重启就没、用户放在 exe 旁边的 `.env` 也读不到。
+    所以冻结时一律用 `sys.executable` 的目录。抽成纯函数是为了能单测（自检里有一条）。
+    """
+    if frozen and exe:
+        return os.path.dirname(os.path.abspath(exe))
+    return os.path.dirname(pkg_dir)
+
+
+PROJECT_DIR = resolve_project_dir(
+    PKG_DIR,
+    frozen=bool(getattr(sys, "frozen", False)),
+    exe=getattr(sys, "executable", None),
+)
 
 TESTS_DIR = os.path.join(PROJECT_DIR, "tests")
 TOOLS_DIR = os.path.join(PROJECT_DIR, "tools")
