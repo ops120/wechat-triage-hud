@@ -153,9 +153,13 @@ python -m wechat_triage_hud.hud     # 或装过包后用：wechat-triage-hud
 
 ```bat
 build.bat          :: 双击运行；产物在 dist\wechat-triage-hud\
+build.bat --venv   :: 改用 pip 虚拟环境打包（首次自动建 .venv-build 并装依赖）
 ```
 
 - **前提**：Windows + Python 3.10+ + `pip install -r requirements.txt pyinstaller`
+- **conda 还是 venv？两个都行**：脚本用当前 PATH 上的 `python`，开头会打印正在用哪个环境。
+  conda 已实测通过（spec 里兜住了"conda 把 Qt/PySide6/libffi 的 DLL 放在 `Library\bin`"这件事）；
+  `--venv` 走 PyInstaller 官方假设的 pip 环境（PySide6 轮子自带 DLL，更省事）
 - **产物**：`dist\wechat-triage-hud\`（实测约 **365 MB**，大头是 opencv 111MB + onnxruntime 40MB +
   Qt ICU 31MB + OCR 模型；`llvmlite`/`scipy` 那 180MB 属于被间接拖进来的死重，spec 里已排除）。
   整个文件夹拷给他人即可，`wechat-triage-hud.exe` 双击就能跑

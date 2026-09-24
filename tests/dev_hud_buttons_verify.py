@@ -1961,6 +1961,27 @@ def main() -> int:
     finally:
         H.ENV_PATH = _env_saved
 
+    # 打包的 DLL 借用策略：三类环境各借什么，必须说得清、可断言（免得改坏了对非 conda 用户失效）
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location(
+        "dll_policy", os.path.join(H.PROJECT_DIR, "packaging", "dll_policy.py"))
+    _dp = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_dp)
+    _none_dir = lambda p: False          # 假装任何目录都不存在 = "没有 conda"
+    check("打包 DLL 策略：非 conda 环境一个都不借（PyInstaller 常规路径）",
+          _dp.lib_dirs("C:/Python312", "C:/Python312", isdir=_none_dir) == []
+          and _dp.all_patterns("C:/Python312", "C:/Python312", isdir=_none_dir) == [],
+          f"dirs={_dp.lib_dirs('C:/Python312', 'C:/Python312', isdir=_none_dir)}")
+    check("打包 DLL 策略：conda 建的 venv 只借 stdlib（不借 Qt——否则两套 Qt 混装）",
+          not any("Qt6" in p or "shiboken" in p
+                  for p in _dp.dll_patterns("G:/r/.venv-build", "G:/ProgramData/miniconda3"))
+          and any("ffi" in p
+                  for p in _dp.dll_patterns("G:/r/.venv-build", "G:/ProgramData/miniconda3")),
+          f"{_dp.dll_patterns('G:/r/.venv-build', 'G:/ProgramData/miniconda3')[:3]}…")
+    check("打包 DLL 策略：conda 本体才借 Qt/shiboken",
+          any("Qt6" in p for p in _dp.dll_patterns("G:/miniconda3", "G:/miniconda3"))
+          and any("shiboken" in p for p in _dp.dll_patterns("G:/miniconda3", "G:/miniconda3")),
+          "conda 本体 → 含 Qt6/shiboken")
+
     bar18.topic = "单聊"                       # 私聊：第二列放的是危险等级文字
     bar18._apply_scene_labels()
     check("私聊的列头文案跟着换（危险等级 / 信息量）",

@@ -22,6 +22,27 @@ setlocal enabledelayedexpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
+rem ---- optional: build inside a pip venv instead of the active environment ----
+rem   build.bat --venv  -> creates .venv-build, installs deps there, builds with it.
+rem   Why: PyInstaller officially assumes a pip env; the PySide6 wheels carry their own
+rem   DLLs, so the conda-specific DLL collection in the .spec becomes unnecessary.
+rem   (Either environment works -- the script just uses whatever "python" resolves to.)
+set "VENV_DIR=%CD%\.venv-build"
+if /i "%~1"=="--venv" (
+    if not exist "%VENV_DIR%\Scripts\python.exe" (
+        echo.
+        echo [venv] Creating .venv-build and installing dependencies ^(first run: several minutes^)
+        python -m venv "%VENV_DIR%"
+        "%VENV_DIR%\Scripts\python.exe" -m pip install --upgrade pip -q
+        "%VENV_DIR%\Scripts\python.exe" -m pip install -r requirements.txt pyinstaller
+        if errorlevel 1 ( echo   X venv setup failed & pause & exit /b 1 )
+    ) else (
+        echo.
+        echo [venv] Reusing existing .venv-build
+    )
+    set "PATH=%VENV_DIR%\Scripts;%PATH%"
+)
+
 echo.
 echo [1/7] Checking Python and dependencies
 where python >nul 2>nul
@@ -35,12 +56,12 @@ python -c "import PyInstaller" 2>nul
 if errorlevel 1 ( echo   X PyInstaller missing - run: pip install pyinstaller & pause & exit /b 1 )
 python -c "import PySide6, rapidocr_onnxruntime, mss, cv2, win32gui, numpy" 2>nul
 if errorlevel 1 ( echo   X runtime deps missing - run: pip install -r requirements.txt & pause & exit /b 1 )
+python -c "import sys; print('  env: ' + sys.prefix + '  [' + sys.version.split()[0] + ', ' + ('conda' if 'conda' in sys.prefix.lower() else 'venv/system') + ']')"
 python -c "import sys; sys.exit(1 if 'conda' in sys.prefix.lower() else 0)"
 if not errorlevel 1 (
     echo   ! conda environment detected: conda keeps Qt/PySide6/libffi DLLs in Library\bin.
     echo     The .spec already collects those by name; if you still hit a DLL ImportError,
-    echo     build inside a pip venv instead:
-    echo       python -m venv .venv-build ^&^& .venv-build\Scripts\pip install -r requirements.txt pyinstaller
+    echo     rebuild with:  build.bat --venv
 )
 echo   OK
 

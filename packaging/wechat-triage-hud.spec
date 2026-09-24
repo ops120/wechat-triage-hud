@@ -4,12 +4,15 @@
 用法：`pyinstaller --noconfirm packaging/wechat-triage-hud.spec`（或直接跑 build.bat）
 
 为什么这么配（都是踩过/查过的）：
-- **onedir 而不是 onefile**：onefile 每次启动要把 ~200MB 解包到临时目录，面板启动要等十几秒，
+- **onedir 而不是 onefile**：onefile 每次启动要把几百 MB 解包到临时目录，面板启动要等十几秒，
   而且解包目录会被当成"程序目录"（`paths.resolve_project_dir` 已处理，但没必要受这个罪）。
 - **windowed（无控制台）**：这是常驻 HUD，弹个黑框很难看；无控制台时 `sys.stdout` 是 None，
   所以入口用 `packaging/run_hud.py`（它先把 stdout/stderr 换成桩）。
-- **`--collect-data rapidocr_onnxruntime`**：它自带字典/config 与 onnx 模型，不收就 OCR 直接失败。
+- **rapidocr 必须 collect_all**（不能只 collect_data_files）：它的识别器是运行时按名字
+  import 子模块的，只收数据文件会让打包版一开 OCR 就报
+  `module 'ch_ppocr_v3_det' has no attribute 'TextDetector'`。
 - `win32gui/win32con/win32api` 是 pywin32 的子模块，PyInstaller 有时抓不全，显式列上。
+- **conda 与 venv 都支持**，见下面 DLL 那段的分工。
 """
 import os
 
@@ -24,30 +27,16 @@ if not os.path.exists(ICON):
 datas = []
 binaries = []
 
-# conda 的 Python：DLL 放在 <prefix>\Libraryin，PyInstaller 不会自动收 —— 后果是
-# 打包好的 exe 一启动就 `ImportError: DLL load failed while importing _ctypes`（真踩过）。
-# 这里把运行时真的需要的几个按名字收进来（`ffi-8.dll` 就是 _ctypes 依赖的那个；
-# conda 管它叫 ffi-8.dll，不叫 libffi*.dll，所以按 "ffi*.dll" 匹配）。
-import glob
+# 要借哪些"环境里的 DLL"：策略抽在 packaging/dll_policy.py（纯函数，自检会验），
+# 这里只负责把结果交给 PyInstaller。一句话：conda 本体借 stdlib+Qt，venv 只借 stdlib，
+# 非 conda（python.org）一个都不借 —— PyInstaller 常规路径，对他们这段是空操作。
+import glob                                     # noqa: F401 （保留：老 spec 依赖过 glob）
 import sys as _sys
-_CONDA_BIN = os.path.join(_sys.prefix, "Library", "bin")
-if os.path.isdir(_CONDA_BIN):
-    for _pat in ("ffi*.dll", "liblzma.dll", "libbz2.dll", "libexpat.dll",
-                 "zlib.dll", "libzstd*.dll", "libjpeg.dll", "libpng16.dll",
-                 "libtiff.dll", "libwebp*.dll", "concrt140.dll",
-                 "msvcp140*.dll", "vcruntime140*.dll",
-                 # conda 的 PySide6 把 Qt/shiboken 的 DLL 也放在这里（名字是
-                 # shiboken6.cp313-win_amd64.dll，pip 轮子里才叫 shiboken6.abi3.dll）——
-                 # 不收它们的后果是打包好的 exe 启动时报
-                 # `ImportError: DLL load failed while importing Shiboken`。
-                 # 只放"入口"三个 Qt DLL，其余依赖 PyInstaller 自己分析出来。
-                 "shiboken6*.dll", "pyside6*.dll",
-                 "Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll",
-                 "icudt*.dll", "icuin*.dll", "icuuc*.dll"):
-        for _f in glob.glob(os.path.join(_CONDA_BIN, _pat)):
-            if not _f.endswith(".dll"):
-                continue
-            binaries.append((_f, "."))
+# SPECPATH 本身就是 spec 所在目录（= packaging/）；别再 dirname 一次，否则加的是仓库根。
+_sys.path.insert(0, os.path.abspath(SPECPATH))
+from dll_policy import all_patterns as _all_patterns
+for _f in _all_patterns(_sys.prefix, getattr(_sys, "base_prefix", None)):
+    binaries.append((_f, "."))
 
 hidden = ["win32gui", "win32con", "win32api"]
 try:

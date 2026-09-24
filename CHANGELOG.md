@@ -72,6 +72,16 @@
 
 ### Fixed
 
+- **打包脚本补齐"该做的事"**：重建不再清掉 `dist\.env` 与 `dist\out\`（先暂存后放回）、
+  打包后**自动跑 `--selftest-ocr`**（不通过就拒绝出包）、`--zip` 产出可分发压缩包
+  （自动排除 `.env` 与 `out\`）；spec 排除 `llvmlite`/`scipy`/`numba` 等被间接拖进来的死重
+  —— 产物 554MB → **约 360MB**
+- **打包 DLL 策略抽成可测的 `packaging/dll_policy.py`**：conda 本体借 stdlib+Qt、
+  conda 建的 venv 只借 stdlib（借 Qt 会两套混装 → `DLL load failed while importing QtGui`）、
+  **没有 conda 的用户一个都不借**（PyInstaller 常规路径，这段对他们完全是空操作）。
+  自检 +3 条断言钉住这三类环境
+- **没配 API Key 时面板不再"无声地卡住"**
+
 - **小球压住微信消息区时会让扫描一直停摆**：自遮挡保护原来是"矩形相交（>8px）就算遮挡"，
   于是用户把微信拖到右边、球正好落在消息区里 → 面板一直报"面板压住了微信消息区"、什么都不判。
   改成按**重叠比例**判：重叠不到消息区面积的 **2%** 不算遮挡（52px 球约 1%，而且它是一张圆图、
