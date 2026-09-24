@@ -1912,6 +1912,25 @@ def main() -> int:
           and os.path.normpath(_dev_dir) == os.path.normpath("G:/repo"),
           f"冻结时={_exe_dir!r} 开发时={_dev_dir!r}")
 
+    # 用了但没导入的名字 = "只在异常分支才炸"的那类 bug。用户真机踩到过：
+    # wechat_capture 里 sys.stderr 没导入 → OCR 一报错，**处理异常的那段自己又抛 NameError**，
+    # 面板上写着"扫描失败：NameError: name 'sys' is not defined"，小球也跟着看不见。
+    # 静态检查能直接抓出来，装了就每次都跑；没装（INFO）不挡验收。
+    try:
+        import io as _io
+        import pyflakes.api as _pfa
+        import pyflakes.reporter as _pfr
+        from wechat_triage_hud import paths as _paths
+        _buf = _io.StringIO()
+        for _m in ("hud.py", "person_engine.py", "qset.py", "triage.py", "wechat_capture.py",
+                   "wechat_window.py", "jev_engine.py", "jev_log.py", "settings.py", "paths.py"):
+            _pfa.checkPath(os.path.join(_paths.PROJECT_DIR, "wechat_triage_hud", _m),
+                           _pfr.Reporter(_buf, _buf))
+        _bad = [ln for ln in _buf.getvalue().splitlines() if "undefined name" in ln]
+        check("产品代码里没有「用了但没导入」的名字（pyflakes）", not _bad, f"{_bad[:3]}")
+    except ImportError:
+        info("跳过 pyflakes 静态检查（未安装 pyflakes；装了就会跑）")
+
     bar18.topic = "单聊"                       # 私聊：第二列放的是危险等级文字
     bar18._apply_scene_labels()
     check("私聊的列头文案跟着换（危险等级 / 信息量）",

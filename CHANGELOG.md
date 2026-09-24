@@ -19,6 +19,10 @@
 
 ### Added
 
+- **打包成 exe**：`build.bat` + `packaging/`（PyInstaller onedir + 无控制台 + 启动器兜住 stdout）。
+  打包后**数据目录落在 exe 旁边**（`paths.resolve_project_dir()`；否则 `out/` 会写进临时解包目录，
+  重启即失、也读不到用户放在 exe 旁的 `.env`）。实测：exe 启动、面板、托盘、热键、OCR、
+  遮挡判定都正常；产物约 330 MB
 - **许可**：[Apache License 2.0](LICENSE)
 - **文档用的模拟图生成器** `tools/render_mocks.py`：用虚构数据离屏渲染 `screenshots/*.png`
   （群聊/私聊/点消息单判/风险两种显示/小球/设置/位置示意）。真实截图含聊天原文绝不入库，
@@ -70,6 +74,11 @@
 
 ### Fixed
 
+- **`wechat_capture.py` 用了 `sys` 却没导入**（用户真机踩到）：那三处在 OCR 异常分支里写
+  `sys.stderr`，于是"处理异常的那段自己又抛 NameError"，面板上写着
+  `扫描失败：NameError: name 'sys' is not defined`，小球也一起不见了。
+  自检加了一道 **pyflakes** 闸（"产品代码里不许有用了没导入的名字"），这类只在异常分支
+  才炸的 bug 从此静态就能抓出来
 - **左列徽标"看不清"（真因：选中高亮污染子控件）**：行的选中底色是用**无选择器**样式表设的，
   Qt 会把它套到子控件上，把风险徽标（橙红底白字）盖成选中蓝。改成 `paintEvent` 自己画圆角底色，
   子控件样式表说了算；自检加了**像素级**断言（#c2410c / #fff1cc）

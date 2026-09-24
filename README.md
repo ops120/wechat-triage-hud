@@ -46,6 +46,7 @@ staying silent unless something actually needs you. No injection into WeChat, no
 - [快速开始](#快速开始)
 - [面板操作](#面板操作)
 - [配置](#配置)
+- [打包成 exe](#打包成-exe给别人用)
 - [验证与测试](#验证与测试)
 - [目录结构](#目录结构)
 - [关键设计决策](#关键设计决策)
@@ -227,6 +228,30 @@ python -m wechat_triage_hud.hud      # 或装过包后用：wechat-triage-hud
 | Choice 结论清晰门槛 | **0.60** | 顶项概率达到它才敢给明确结论，否则显示「判不了」 | 模型对 Choice 类题实测**过度自信**（T≈3.29），所以不给「91%」这种假精确 |
 | 最高打扰级别门槛 | **0.75** | 要打扰到你（⚠ 高亮）所需的把握 | 最高打扰级别的门槛：调高更少 ⚠，调低更容易被打扰 |
 
+## 打包成 exe（给别人用）
+
+打包是**在本机跑一次**的事（仓库不带 CI）：
+
+```bat
+build.bat          :: 双击即可；产物在 dist\wechat-triage-hud\
+```
+
+- **前提**：Windows + Python 3.10+ + `pip install -r requirements.txt pyinstaller`
+- **产物**：`dist\wechat-triage-hud\`（实测约 **330 MB**，大头是 PySide6 与离线 OCR 模型）。
+  整个文件夹拷给别人即可，`wechat-triage-hud.exe` 双击就能跑
+- **数据落在 exe 旁边**（`out\` 与 `.env`），不是临时目录 —— 拷走文件夹，日志与设置跟着走
+- 产物目录里已放好 `.env.example` 与 `使用说明.txt`（第一次用：改名 `.env` 填 Key）
+
+**实测记录**（本机打包并真跑过）：exe 启动、面板窗口、托盘图标、全局热键、OCR 扫描、
+遮挡判定（微信被盖住时不扫）都正常；`out\` 确实建在 exe 旁边。
+
+**打包报错怎么办**（两个真踩过的坑）：
+
+| 报错 | 原因与解法 |
+| :--- | :--- |
+| `ImportError: DLL load failed while importing _ctypes / Shiboken` | 你在 **conda 环境**里打包。conda 把 Qt / PySide6 / libffi 的 DLL 放在 `<prefix>\Library\bin`（pip 轮子才放在包内），`packaging\*.spec` 里已经针对这种情况收了一批；若还缺，改用 pip 虚拟环境最省事：`python -m venv .venv-build` → `.venv-build\Scripts\pip install -r requirements.txt pyinstaller` |
+| `PermissionError: ..._internal\xxx.dll` | 上一个 exe 还在跑（窗口版崩溃时会挂着错误框），先退出或 `taskkill /F /IM wechat-triage-hud.exe` |
+
 ## 验证与测试
 
 **两套是真离线**（不需要微信、不需要 Key、不花钱，CI 里跑的就是它们）；其余分别要真微信或真 Key。
@@ -276,6 +301,7 @@ wechat-triage-hud/
 │   └── hud.py                  ★ 入口：悬浮面板
 ├── tests/                     可重复跑的验收（见 tests/README.md）
 │   └── oneoff/                 一次性真机探针（留档不维护）
+├── build.bat  packaging/       打包成 exe（PyInstaller：启动器 + spec + 用户使用说明）
 ├── tools/                      诊断工具（OCR 探针、控件树 dump、旧路线留档）
 ├── screenshots/               **样例图**（虚构数据渲染，可入库；真实截图绝不入库）
 └── out/                        运行产物（gitignore，含聊天原文，绝不入库）
