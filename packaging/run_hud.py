@@ -13,6 +13,9 @@ import os
 import sys
 
 
+_QAPP = None        # 自检里那个 QGuiApplication 的引用（必须活着）
+
+
 class _Null:
     """替掉 None 的 stdout/stderr：只吞写入，不当异常源。"""
 
@@ -50,8 +53,10 @@ def _selftest_ocr() -> int:
         import numpy as np
         from PySide6.QtGui import QColor, QGuiApplication, QFont, QImage, QPainter
 
-        # 画字要用 QGuiApplication（不然 QFontDatabase 直接报错 —— 自检自己先踩了一次）
-        _app = QGuiApplication.instance() or QGuiApplication([])
+        # 画字要用 QGuiApplication（不然 QFontDatabase 直接报错 —— 自检自己先踩了一次）。
+        # 存成**模块级全局**：局部变量会被回收，QApplication 一生效对象就崩。
+        global _QAPP
+        _QAPP = QGuiApplication.instance() or QGuiApplication([])
         img = QImage(360, 90, QImage.Format_RGB888)
         img.fill(QColor("white"))
         pt = QPainter(img)
@@ -70,7 +75,7 @@ def _selftest_ocr() -> int:
         res, elapse = ocr(buf)
         texts = [t[1] for t in (res or [])]
         ok = bool(texts)
-        lines.append(f"OCR 引擎加载：OK")
+        lines.append("OCR 引擎加载：OK")
         lines.append(f"识别到 {len(texts)} 段（{elapse}）：{texts}")
     except Exception as e:                       # noqa: BLE001
         lines.append(f"OCR 失败：{type(e).__name__}: {e}")

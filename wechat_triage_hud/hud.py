@@ -44,7 +44,7 @@ from .qset import (                                 # noqa: E402
 from .triage import Throttle, triage               # noqa: E402
 
 from .paths import (                                     # noqa: E402
-    AUDIT_PATH, BALL_IMG, DEBUG_PATH, ENV_PATH, HIST_PATH, META_PATH, OUT_DIR,
+    AUDIT_PATH, BALL_IMG, DEBUG_PATH, ENV_PATH, PROJECT_DIR, HIST_PATH, META_PATH, OUT_DIR,
     UI_PATH,
 )
 
@@ -197,7 +197,7 @@ def _title_same_conv(a: str, b: str) -> bool:
     否则会把两个不同的群并成一个（这是这个启发式的已知代价，宁可多切一次也不能串群）。
     """
     import re as _re
-    strip = _SIG_KEEP if _SIG_KEEP is not None else None
+
     def n(t: str) -> str:
         return _re.sub(r"\s+", "", t or "")
     x, y = n(a), n(b)
@@ -501,7 +501,7 @@ class SettingsDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        from .settings import (RANGES, LABELS, SETTINGS, help_text, help_tooltip)
+        from .settings import RANGES, LABELS, SETTINGS, help_tooltip
         self.setWindowTitle("设置")
         self.setWindowFlags(Qt.Dialog | Qt.WindowStaysOnTopHint)
         self.setMinimumWidth(470)
@@ -1144,6 +1144,8 @@ class HudBar(QWidget):
         self.prefs = UiPrefs()
         self.ball_mode = bool(self.prefs.get("ball_mode", False))
         self._hide_noted = False        # "已收成小球"的托盘气泡每次运行只提示一次
+        self._worker_dead = ""          # 判断线程不可用的原因（报过一次就不再刷）
+        self._worker_stuck_since = 0.0  # 有排队但线程没跑，从什么时候开始的
         self.ball_xy = self.prefs.get("ball_xy")
         self._ball_bad = None       # 扫描出问题时的原因（球变红）
         self._ball_qss = None       # 上次的样式，避免每 3 秒重复刷样式表
@@ -1172,6 +1174,16 @@ class HudBar(QWidget):
 
         self.worker = TriageWorker(self)
         self.worker.done.connect(self.on_triage)
+        # 启动就先看一眼 Key：没有它，之后每次判断都会"无声地等待"（打包版最容易踩：
+        # 用户只拷了 exe 目录、忘了放 .env）。这里直接写在状态行上，别让人等到"卡住"。
+        try:
+            from .jev_engine import load_api_key as _load_key
+            _load_key(ENV_PATH)
+        except Exception as _e:                      # noqa: BLE001
+            self._worker_dead = f"缺少 API Key（{_e}）"
+            QTimer.singleShot(0, lambda: self._hint(
+                f"缺少 API Key：把 .env 放在 {PROJECT_DIR} 里（一行 jevkey=apikey_…），否则不会有判断",
+                "#dc2626"))
         self.worker.msg_done.connect(self.on_msg_done)
         self.worker.failed.connect(self.on_fail)
         self.worker.stage.connect(self.on_stage)
@@ -1886,6 +1898,7 @@ class HudBar(QWidget):
             self.dragging = False
         self._check_expand_request()
         self._check_scanner()
+        self._check_worker()
         self._flush_hist()
         if self.dragging or self._user_resizing:
             # 用户正在拖右下角把手：这时**不能**再按内容算尺寸/挪位置，否则会和用户抢 ——
@@ -2812,7 +2825,6 @@ class HudBar(QWidget):
             self.r_body.addWidget(QLabel("正在判这条…（只送这一条 + 前后文；判过的不再花钱）"))
             self._sync_scroll_height()
             return
-        _dm = True                                     # 复用私聊那套标签
         ti, sn = r.get("true_intent") or r.get("role") or "", r.get("she_needs") or ""
         lit = r.get("literal")
         has_sub = (lit if lit is not None else 1.0) < 0.5
@@ -3143,9 +3155,57 @@ class HudBar(QWidget):
         self.follow()
 
     def on_fail(self, msg: str):
+        """Worker 报错：不只写在右栏小字里，**状态行与页脚也要写**。
+
+        踩过的坑（用户："怎么卡住了"）：打包版旁边没有 .env → 判断线程初始化就失败、
+        之后提交的任务**永远不会被处理**，而面板当时只在右栏留一行小字，进度行一直停在
+        "提交判断 · N 人待筛" —— 看起来就是在忙，实际什么都不会发生。
+        """
         self.r_hint.setVisible(True)
         self.r_hint.setText(f"调用失败：{msg[:130]}")
+        self._hint(f"判断不可用：{msg[:60]}", "#dc2626")
+        self.set_progress("完成", 100, f"判断不可用：{msg[:40]}")
+        self.foot.setText(f"判断不可用 · {msg[:90]}")
+        self._worker_dead = msg
         self.adjustSize()
+
+    def _check_worker(self) -> None:
+        """判断线程的看门狗：**有任务在排队，但线程没在跑** → 必须说出来。
+
+        没有它的时候，Worker 一旦没起来（最常见：Key 没配 / 初始化失败），
+        面板就永远停在"提交判断 · N 人待筛"，用户只能看到"卡住"。
+        """
+        w = getattr(self, "worker", None)
+        if w is None or self.paused or getattr(self, "_shutting_down", False):
+            return                                 # __init__ 期 follow() 会先到，属性可能还没建
+        try:
+            running = bool(w.isRunning())
+            finished = bool(w.isFinished())         # 线程**已结束**才算"死"（没启动过不算）
+            pending = bool(getattr(w, "_jobs", None))
+        except Exception:
+            return                                  # 桩/别的实现没有这些方法 → 不掺和
+        if running or finished is False or not pending:
+            self._worker_stuck_since = 0.0
+            return
+        now = time.time()
+        if not self._worker_stuck_since:
+            self._worker_stuck_since = now
+        if now - self._worker_stuck_since < 5:
+            return
+        if self._worker_dead:
+            return                      # 已经报过（on_fail 报的那次更具体）
+        reason = "判断线程没在跑"
+        try:
+            from .jev_engine import load_api_key
+            load_api_key(ENV_PATH)      # 只为把"Key 没配"这个最常见原因说准
+        except Exception as e:          # noqa: BLE001
+            reason = f"缺少 API Key（{e}）"
+        tip = f"{reason} —— 把 .env 放在 {PROJECT_DIR} 里（内容一行：jevkey=apikey_…）"
+        dbg(f"判断线程卡住：{tip}")
+        self._worker_dead = tip
+        self._hint(tip[:80], "#dc2626")
+        self.set_progress("完成", 100, tip[:46])
+        self.foot.setText("判断不可用 · " + tip[:88])
 
     def _shutdown(self):
         """落盘 + 停线程。幂等：closeEvent 与"菜单退出"两条路都会走到这里。"""

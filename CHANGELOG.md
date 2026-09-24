@@ -68,6 +68,12 @@
 
 ### Fixed
 
+- **没配 API Key 时面板"无声地卡住"**（用户报"怎么卡住了"）：打包版旁边没有 `.env` →
+  判断线程初始化就失败、之后提交的任务永远没人处理，而面板只在右栏留了一行小字，
+  进度行一直停在「提交判断 · N 人待筛」、日志 0 B，看着就像在忙。现在：启动就检查 Key
+  并写在状态行上；判断线程已结束且有任务排队时，看门狗把原因写到状态行与页脚
+  （顺带指出 `.env` 该放哪个目录）
+
 - **打包版的 OCR 起不来**（用户真机报 `AttributeError: module 'ch_ppocr_v3_det' has no
   attribute 'TextDetector'`）：spec 只 `collect_data_files` 收了 rapidocr 的**数据文件**，
   没收它的**子模块**（识别器是运行时按名字 import 的）。改用 `collect_all`

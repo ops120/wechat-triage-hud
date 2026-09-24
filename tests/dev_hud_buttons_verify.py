@@ -1931,6 +1931,33 @@ def main() -> int:
     except ImportError:
         info("跳过 pyflakes 静态检查（未安装 pyflakes；装了就会跑）")
 
+    # 缺 API Key 不许"无声等待"（用户报"怎么卡住了"：面板停在"提交判断 · 1 人待筛"、
+    # 日志 0 B，而原因是打包版旁边没有 .env → 判断线程初始化就失败、任务永远没人处理）
+    _env_saved = H.ENV_PATH
+    H.ENV_PATH = os.path.join(TMP, "no_such_env")
+    os.environ.pop("JEVKEY", None)
+    try:
+        bar19 = build_bar(fake)
+        for _ in range(6):
+            app.processEvents()
+            time.sleep(0.05)
+        check("没配 Key 时面板立刻说明原因（不再无声地干等）",
+              "API Key" in bar19._worker_dead and "API Key" in bar19.hint.text(),
+              f"原因={bar19._worker_dead[:60]!r} 提示={bar19.hint.text()[:60]!r}")
+        # 看门狗：线程已结束 + 有排队任务 = 必须说出来（这里把计时器拨到过去，确定性触发）
+        bar19.worker._jobs = [(1,)]
+        bar19.worker.isRunning = lambda: False     # 桩里没有这两个方法，看门狗会 try/except 跳过
+        bar19.worker.isFinished = lambda: True
+        bar19._worker_dead = ""
+        bar19._worker_stuck_since = time.time() - 10
+        bar19._check_worker()
+        check("判断线程已死 + 有任务排队 → 看门狗把原因写到页脚（不再看着像在忙）",
+              "判断不可用" in bar19.foot.text() and "API Key" in bar19.foot.text(),
+              f"页脚={bar19.foot.text()[:70]!r}")
+        teardown(bar19)
+    finally:
+        H.ENV_PATH = _env_saved
+
     bar18.topic = "单聊"                       # 私聊：第二列放的是危险等级文字
     bar18._apply_scene_labels()
     check("私聊的列头文案跟着换（危险等级 / 信息量）",
