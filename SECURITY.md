@@ -36,7 +36,7 @@
 | 路径 | 内容 | 处理 |
 | :--- | :--- | :--- |
 | `out/jev_audit.jsonl` | **完整聊天原文**（请求与响应的原始字节） | 面板「日志」双击可一键清空；绝不提交、绝不外发 |
-| `out/speaker_history.json` | 按会话累积的消息历史（F-25） | 同上；删掉即等于关闭累积 |
+| `out/speaker_history.json` | 按会话累积的消息历史 | 同上；删掉即等于关闭累积 |
 | `out/group_meta.json` | 你的群昵称、职责、群性质、私聊关系 | 只在本机使用；会随判断请求发给模型当判据 |
 | `out/ui_prefs.json` / `out/settings.json` | 面板外观与本机设置 | 不含聊天内容 |
 

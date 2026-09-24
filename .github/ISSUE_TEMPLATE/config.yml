@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: 先读文档（现状 / 已验证 vs 未验证 / 已知限制）
+  - name: 先读文档（它做什么 / 适用与不适用 / 项目状态）
     url: https://github.com/ops120/wechat-triage-hud/blob/main/README.md
-    about: 很多"看起来不对"的行为其实是设计取舍（默认沉默、逃逸、遮挡即停），README 有说明
+    about: 很多"看起来不对"的行为其实是设计取舍（默认沉默、遮挡即停、不做承诺的效果），README 有说明
   - name: 安全与隐私问题
     url: https://github.com/ops120/wechat-triage-hud/blob/main/SECURITY.md
     about: 数据流向、Key 处理、审计日志的敏感级别；报告时请先脱敏

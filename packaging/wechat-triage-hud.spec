@@ -49,13 +49,25 @@ if os.path.isdir(_CONDA_BIN):
                 continue
             binaries.append((_f, "."))
 
+hidden = ["win32gui", "win32con", "win32api"]
 try:
-    from PyInstaller.utils.hooks import collect_data_files, collect_submodules
-    datas += collect_data_files("rapidocr_onnxruntime")
-    hidden = (collect_submodules("win32com")
-              + ["win32gui", "win32con", "win32api", "win32ui", "pywintypes", "pythoncom"])
-except Exception:
-    hidden = ["win32gui", "win32con", "win32api"]
+    from PyInstaller.utils.hooks import collect_all, collect_submodules
+    # **必须 collect_all，不能只 collect_data_files**：rapidocr 的识别器是运行时按名字
+    # 去 import 子模块的（`ch_ppocr_v3_det.text_detect.TextDetector`），只收数据文件的话
+    # 打包版一开 OCR 就报 `module 'ch_ppocr_v3_det' has no attribute 'TextDetector'`
+    # （用户真机撞到过）。collect_all = 数据 + 二进制 + **子模块** 一起收。
+    _d, _b, _h = collect_all("rapidocr_onnxruntime")
+    datas += _d
+    binaries += _b
+    hidden += _h
+    _d2, _b2, _h2 = collect_all("onnxruntime")
+    datas += _d2
+    binaries += _b2
+    hidden += _h2
+    hidden += collect_submodules("win32com")
+    hidden += ["win32ui", "pywintypes", "pythoncom"]
+except Exception as _e:                      # noqa: BLE001
+    print(f"[spec] collect_all 失败（{_e}）—— 打包出来的 OCR 可能不可用")
 
 a = Analysis(
     [os.path.join(ROOT, "packaging", "run_hud.py")],
