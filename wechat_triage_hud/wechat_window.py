@@ -7,6 +7,13 @@
   * 最小化时 rect 变成 (-32000,-32000,...)，area 计算会失效
     → 用 IsIconic 判断，用 GetWindowPlacement.rcNormalPosition 取还原后的位置
   * Weixin.exe 有多个进程（主进程+辅助），窗口 PID 不固定，需按 exe 名筛
+
+4.1.15.13（2026-09-29 真机）：主窗口**标题不再跟会话走**，固定就是「微信」。
+被排除名单一票否掉的直接后果是 find_main() 恒为 None —— 面板不露脸（set_ball 后
+first 分支等 follow() 决定显隐，follow() 见 w 为 None 就 setVisible(False)），
+调试日志只写「找不到可见的微信窗口」，看起来像用户没开微信。
+所以「微信」降级为**存疑标题**：有正常标题的窗口就用正常的（老版本行为不变），
+一个都没有才退到它，并要求面积够大（老版本里叫「微信」的多是小窗）。
 """
 from __future__ import annotations
 
@@ -18,8 +25,10 @@ import psutil
 import win32con
 import win32gui
 
-EXCLUDE_TITLES = {"Weixin", "WxTrayIconMessageWindow", "微信"}
+EXCLUDE_TITLES = {"Weixin", "WxTrayIconMessageWindow"}
+AMBIGUOUS_TITLES = {"微信"}          # 4.1.15.13 主窗口的固定标题；老版本里是别的窗口
 MIN_AREA = 60_000
+MAIN_MIN_AREA = 180_000             # 存疑标题要够大才算主窗口（小窗够不着）
 
 
 def wechat_pids() -> set[int]:
@@ -62,8 +71,10 @@ def _normal_rect(hwnd: int) -> tuple:
 
 
 def list_windows() -> list[WinInfo]:
+    """候选主窗口，**正常标题的排在存疑标题前面**（调用方只取第一个）。"""
     pids = wechat_pids()
-    out: list[WinInfo] = []
+    strong: list[WinInfo] = []           # title 是会话名的（老版本的正经主窗口）
+    weak: list[WinInfo] = []             # title 存疑（4.1.15.13 的「微信」）
 
     def cb(h, _):
         try:
@@ -81,22 +92,30 @@ def list_windows() -> list[WinInfo]:
                 return True
             nr = _normal_rect(h)
             w, hh = nr[2] - nr[0], nr[3] - nr[1]
-            if w * hh < MIN_AREA:
+            area = w * hh
+            if area < MIN_AREA:
                 return True
-            out.append(WinInfo(
+            info = WinInfo(
                 hwnd=h, title=title, cls=cls,
                 rect=tuple(win32gui.GetWindowRect(h)),
                 normal_rect=nr,
                 minimized=bool(win32gui.IsIconic(h)),
                 visible=bool(win32gui.IsWindowVisible(h)),
-            ))
+            )
+            if title in AMBIGUOUS_TITLES:
+                if area >= MAIN_MIN_AREA:
+                    weak.append(info)
+            else:
+                strong.append(info)
         except Exception:
             pass
         return True
 
     win32gui.EnumWindows(cb, None)
-    out.sort(key=lambda w: -(w.width * w.height))
-    return out
+    key = lambda w: -(w.width * w.height)
+    strong.sort(key=key)
+    weak.sort(key=key)
+    return strong + weak
 
 
 def find_main(sticky_hwnd: int | None = None) -> WinInfo | None:
